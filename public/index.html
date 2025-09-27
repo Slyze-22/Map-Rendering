@@ -2,11 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>My Leaflet Map</title>
-  <!-- Leaflet CSS -->
+  <title>Leaflet Map with Plot Labels</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
-    /* Make the map take the full page */
     body, html {
       margin: 0;
       padding: 0;
@@ -17,49 +15,73 @@
       height: 100%;
       width: 100%;
     }
+    .plot-label {
+      font-size: 8px;
+      font-weight: bold;
+      color: white;
+      text-shadow: 1px 1px 2px black;
+    }
   </style>
 </head>
 <body>
-  <!-- Map container -->
   <div id="map"></div>
 
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
   <script>
     // Initialize map
-    const map = L.map('map').setView([9.0820, 8.6753], 6);
+    const map = L.map('map').setView([4.9219, 7.0787], 18);
 
-    // Add OpenStreetMap tiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    // Esri satellite basemap
+    L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', 
+      {
+        attribution: 'Tiles © Esri'
+      }
+    ).addTo(map);
 
-    // Load external GeoJSON (make sure points.geojson is in the same folder as index.html or in /data/)
+    // Load GeoJSON
     fetch('points.geojson')
       .then(res => res.json())
       .then(data => {
         const layer = L.geoJSON(data, {
+          style: feature => ({
+            color: feature.properties.Status === "Available" ? "green" : "red",
+            weight: 1,
+            fillOpacity: 0.5
+          }),
           onEachFeature: (feature, layer) => {
-            if (feature.properties) {
-              const popupContent = `
-                <strong>${feature.properties.name || ''}</strong><br>
-                ${feature.properties.popup || ''}
-              `;
-              layer.bindPopup(popupContent);
-            }
+            const { Plot, Area, Status } = feature.properties;
+
+            // Popup with details
+            const popupContent = `
+              <strong>Plot ${Plot}</strong><br>
+              <b>Status:</b> ${Status}<br>
+              <b>Area:</b> ${Area} m²
+            `;
+            layer.bindPopup(popupContent);
+
+            // Always show Plot number as a label (centered)
+            layer.bindTooltip(`Plot ${Plot}`, {
+              permanent: false,
+              direction: "center",
+              className: "plot-label"
+            });
+
+            // Hover highlight effect
+            layer.on('mouseover', () => {
+              layer.setStyle({ weight: 3, color: "yellow" });
+            });
+            layer.on('mouseout', () => {
+              layer.setStyle({ weight: 1, color: Status === "Available" ? "green" : "red" });
+            });
           }
         }).addTo(map);
 
-        // Zoom to bounds of GeoJSON if available
-        const bounds = layer.getBounds();
-        if (bounds.isValid && bounds.isValid()) {
-          map.fitBounds(bounds.pad(0.1));
-        }
+        // Zoom to all plots
+        map.fitBounds(layer.getBounds().pad(0.05));
       })
-      .catch(err => {
-        console.error('Failed to load GeoJSON', err);
-      });
+      .catch(err => console.error("GeoJSON load error:", err));
   </script>
 </body>
 </html>
